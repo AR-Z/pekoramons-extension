@@ -2,7 +2,7 @@
 // @name        Pekoramons Trading Extension
 // @namespace    arz/ami
 // @version      2.5
-// @description  Inserts pekoramons item values into trades. 
+// @description  Inserts pekoramons item values into trades.
 // @match        *://*.pekora.zip/*
 // @icon         https://pekora.zip/favicon.ico
 // @grant        GM_xmlhttpRequest
@@ -67,9 +67,7 @@
     valueMap.set(cleanName(n), Number(it.Value ?? it.value ?? 0) || 0);
   });
 
-  /* -----------------------
-     Styles (all self-contained)
-     ----------------------- */
+
   const css = `
     /* Overlay container that sits above the page and doesn't affect layout */
     #pekora-overlay {
@@ -137,9 +135,7 @@
   `;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
-  /* -----------------------
-     Overlay management
-     ----------------------- */
+
   let overlay = document.getElementById("pekora-overlay");
   if(!overlay){
     overlay = document.createElement("div");
@@ -202,22 +198,18 @@
 
     const preferredInsideLeft = rect.left + 8 + window.scrollX;
 
-
     const summaryW = summaryEl.offsetWidth || 160;
     const outsideLeftCandidate = rect.left - summaryW - 12 + window.scrollX;
 
     const minViewportX = 6 + window.scrollX;
     let finalLeft;
     if(outsideLeftCandidate >= minViewportX){
-
       finalLeft = outsideLeftCandidate;
     } else {
-
       finalLeft = preferredInsideLeft;
     }
 
     const topVal = rect.bottom - bottomInset - summaryEl.offsetHeight + window.scrollY;
-
     if(summaryEl.offsetHeight === 0 || summaryEl.offsetWidth === 0){
       requestAnimationFrame(()=> {
         const measuredWidth = summaryEl.offsetWidth || summaryW;
@@ -254,11 +246,12 @@
             positionSummaryForModal(child, src);
           }
         } catch(e){
-
+      
         }
       }
     });
   }
+
 
   window.addEventListener("scroll", requestReposition, { passive: true });
   window.addEventListener("resize", requestReposition, { passive: true });
@@ -439,7 +432,6 @@
           continue;
         }
 
-
         const tag = createValueTag(value);
         Object.defineProperty(tag, "_pekora_src_element", { value: box, configurable: true });
         tag.dataset.pekoraSrcType = "box";
@@ -490,7 +482,6 @@
     const title = document.createElement('div');
     title.className = 'title';
     title.textContent = overpay === 0 ? 'Fair Trade' : (overpay > 0 ? `+${formatNumber(overpay)}` : `${formatNumber(overpay)}`);
-
     if(overpay > 0) title.classList.add('pos');
     else if(overpay < 0) title.classList.add('neg');
     summary.appendChild(title);
@@ -520,7 +511,6 @@
     log("inserted tags:", inserted, "giveTotal:", giveTotal, "receiveTotal:", receiveTotal, "overpay:", overpay);
     return inserted;
   }
-
 
   function scheduleEnhanceOnViewDetails(){
     document.body.addEventListener("click", (e)=>{
@@ -560,12 +550,12 @@
 
   scheduleEnhanceOnViewDetails();
 
+
   window.__pekoraEnhancer = {
     reScan: () => { const m = findTradeModal(); if(m) clearModalMarkers(m); const mm = findTradeModal(); if(mm) enhanceModal(mm); },
     dataCount: () => valueMap.size,
     sample: () => Array.from(valueMap.entries()).slice(0,12)
   };
-
 
   window.addEventListener("beforeunload", ()=>{
     if(repositionInterval) clearInterval(repositionInterval);
