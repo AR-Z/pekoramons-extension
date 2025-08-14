@@ -6,6 +6,9 @@
 // @match        *://*.pekora.zip/*
 // @grant        GM_xmlhttpRequest
 // @run-at       document-idle
+// @downloadURL  https://raw.githubusercontent.com/AR-Z/pekoramons-extension/main/index.js
+// @updateURL    https://raw.githubusercontent.com/AR-Z/pekoramons-extension/main/index.js
+// ==/UserScript==
 // ==/UserScript==
 
 (async function () {
