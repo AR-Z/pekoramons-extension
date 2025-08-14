@@ -2,7 +2,7 @@
 // @name        Pekoramons Trading Extension
 // @namespace    arz/ami
 // @version      2.5
-// @description  Inserts pekoramons item values into trades without changing site layout. (Summary positioned at far left inside modal; white text on dark background; label text forced white)
+// @description  Inserts pekoramons item values into trades. 
 // @match        *://*.pekora.zip/*
 // @icon         https://pekora.zip/favicon.ico
 // @grant        GM_xmlhttpRequest
@@ -10,7 +10,7 @@
 // @downloadURL  https://raw.githubusercontent.com/AR-Z/pekoramons-extension/main/index.js
 // @updateURL    https://raw.githubusercontent.com/AR-Z/pekoramons-extension/main/index.js
 // ==/UserScript==
-// ==/UserScript==
+
 
 (async function () {
   "use strict";
