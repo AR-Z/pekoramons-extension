@@ -4,6 +4,7 @@
 // @version      2.5
 // @description  Inserts pekoramons item values into trades without changing site layout. (Summary positioned at far left inside modal; white text on dark background; label text forced white)
 // @match        *://*.pekora.zip/*
+// @icon         https://pekora.zip/favicon.ico
 // @grant        GM_xmlhttpRequest
 // @run-at       document-idle
 // @downloadURL  https://raw.githubusercontent.com/AR-Z/pekoramons-extension/main/index.js
