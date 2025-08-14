@@ -3,7 +3,7 @@
 // @namespace    arz/ami
 // @version      2.0
 // @description  Inserts pekoramons item values into trades.
-// @match        *://*/*
+// @match        ://.pekora.zip/*
 // @grant        GM_xmlhttpRequest
 // @run-at       document-idle
 // ==/UserScript==
