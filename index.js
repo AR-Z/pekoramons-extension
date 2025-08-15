@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name        Pekoramons Trading Extension (Anchored placement + outside-left preference)
+// @name        Pekoramons Trading Extension
 // @namespace   arz/ami
 // @version     4.4
-// @description Inserts item values into trades and collectibles page with anchored overlays. Summary prefers outside-left placement (if space) but remains anchored to modal.
+// @description Inserts item values into trades and collectibles page with anchored overlays
 // @match       *://*.pekora.zip/*
 // @icon        https://pekora.zip/favicon.ico
 // @grant       GM_xmlhttpRequest
