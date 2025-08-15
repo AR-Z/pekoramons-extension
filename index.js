@@ -18,7 +18,11 @@
 
   function cleanName(name){
     if(!name || typeof name !== "string") return "";
-    return name.replace(/[\u200B-\u200F\uFEFF]/g,"").replace(/[^a-zA-Z0-9 ]/g," ").replace(/\s+/g," ").trim().toLowerCase();
+    return name.replace(/[\u200B-\u200F\uFEFF]/g,"")
+               .replace(/[^a-zA-Z0-9 ]/g," ")
+               .replace(/\s+/g," ")
+               .trim()
+               .toLowerCase();
   }
 
   function formatNumber(n){
@@ -145,10 +149,8 @@
 
     let sW = summaryEl.offsetWidth || 160;
     let sH = summaryEl.offsetHeight || 64;
-
     const minViewportX = 6 + window.scrollX;
     const outsideLeftCandidateViewport = modalRect.left - sW - 12 + window.scrollX;
-
     const preferredInsideLeftRelative = SUMMARY_LEFT_INSET;
 
     let finalLeftRelative;
@@ -160,6 +162,7 @@
 
     let finalTopRelative = Math.round(modalRect.height - SUMMARY_BOTTOM_INSET - sH);
     if(finalTopRelative < 6) finalTopRelative = 6;
+
     summaryEl.style.left = `${finalLeftRelative}px`;
     summaryEl.style.top = `${finalTopRelative}px`;
     summaryEl.style.right = "unset";
@@ -177,30 +180,11 @@
     const name = rawName.trim();
     const cleaned = cleanName(name);
     if(valueMap.has(cleaned)) return valueMap.get(cleaned);
-    const parts = name.split(/[:\-–—|]/).map(s=>s.trim()).filter(Boolean);
-    for(const p of parts.reverse()){
-      const c = cleanName(p);
-      if(valueMap.has(c)) return valueMap.get(c);
-    }
+
     const stripped = name.replace(/\(.*?\)|\[.*?\]|\{.*?\}/g, "").trim();
-    const cs = cleanName(stripped);
-    if(valueMap.has(cs)) return valueMap.get(cs);
-    let best = {k:null,len:0};
-    for(const k of valueMap.keys()){
-      if(cleaned.includes(k) || k.includes(cleaned)){
-        if(k.length > best.len) best = {k,len:k.length};
-      }
-    }
-    if(best.k) return valueMap.get(best.k);
-    const nameTokens = new Set(cleaned.split(/\s+/).filter(Boolean));
-    let bestScore = 0, bestKey = null;
-    for(const k of valueMap.keys()){
-      const kt = k.split(/\s+/).filter(Boolean);
-      let score = 0;
-      for(const t of kt) if(nameTokens.has(t)) score++;
-      if(score > bestScore){ bestScore = score; bestKey = k; }
-    }
-    if(bestScore > 0 && bestKey) return valueMap.get(bestKey);
+    const cleanedStripped = cleanName(stripped);
+    if(cleanedStripped && valueMap.has(cleanedStripped)) return valueMap.get(cleanedStripped);
+
     return undefined;
   }
 
@@ -231,6 +215,7 @@
       return boxes;
     })();
     if(strict.length) return strict;
+
     const boxes = [];
     const imgs = Array.from(modal.querySelectorAll("img"));
     for(const img of imgs){
@@ -330,7 +315,7 @@
         const name = findNameInBox(box);
         if(!name){ log("no name found for a box, skipping"); continue; }
         const value = lookupValueForName(name);
-        if(value === undefined || value === null){ log("no value for", name); continue; }
+        if(value === undefined || value === null){ log("no exact value for", name); continue; }
         const tag = createValueTag(formatNumber(value));
         Object.defineProperty(tag, "_pekora_src_element", { value: box, configurable:true });
         tag.dataset.pekoraSrcType = "box";
@@ -506,5 +491,5 @@
 
   window.addEventListener("beforeunload", ()=>{ try{ if(repositionInterval) clearInterval(repositionInterval); mo.disconnect(); }catch(e){} });
 
-  log("PekoraEnhancer ready");
+  log("PekoraEnhancer ready — exact-match lookup enabled");
 })();
