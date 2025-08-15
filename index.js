@@ -1,20 +1,21 @@
 // ==UserScript==
-// @name        Pekoramons Trading Extension
+// @name        Pekoramons Trading Extension.
 // @namespace   arz/ami
-// @version     4.4
-// @description Inserts item values into trades and collectibles page with anchored overlays
+// @version     1.5
+// @description hi description
+// @match       *://pekora.zip/*
+// @match       *://www.pekora.zip/*
 // @match       *://*.pekora.zip/*
 // @icon        https://pekora.zip/favicon.ico
 // @grant       GM_xmlhttpRequest
 // @run-at      document-idle
-// @downloadURL  https://raw.githubusercontent.com/AR-Z/pekoramons-extension/main/index.js
-// @updateURL    https://raw.githubusercontent.com/AR-Z/pekoramons-extension/main/index.js
 // ==/UserScript==
 
 (async function(){
   "use strict";
   const LOG = "[PekoraEnhancer]";
-  function log(...a){ console.log(LOG, ...a); }
+  function log(...args){ console.log(LOG, ...args); }
+
 
   function cleanName(name){
     if(!name || typeof name !== "string") return "";
@@ -24,65 +25,240 @@
                .trim()
                .toLowerCase();
   }
-
   function formatNumber(n){
-    if(!isFinite(n)) return "N/A";
+    if(n === null || n === undefined || !isFinite(Number(n))) return "N/A";
+    n = Number(n);
     if(n >= 1000000) return (n/1000000).toFixed(1) + "M";
     if(n >= 1000) return (n/1000).toFixed(1) + "K";
     return n.toLocaleString();
   }
-
-  async function fetchItems(url){
+  async function fetchJSON(url){
     if(typeof GM_xmlhttpRequest === "function"){
-      return new Promise((res, rej)=>{
+      return new Promise((resolve,reject)=>{
         GM_xmlhttpRequest({
           method: "GET",
           url,
           headers: { Accept: "application/json" },
-          onload: r => { try{ res(JSON.parse(r.responseText)); } catch(e){ rej(e); } },
-          onerror: e => rej(e)
+          onload: r => { try{ resolve(JSON.parse(r.responseText)); } catch(e){ reject(e); } },
+          onerror: e => reject(e)
         });
       });
-    } else if(window.fetch){
-      const r = await fetch(url, { headers:{ Accept: "application/json" }});
+    } else {
+      const r = await fetch(url, { headers: { Accept: "application/json" }});
       if(!r.ok) throw new Error("fetch failed " + r.status);
       return r.json();
-    } else throw new Error("no http available");
+    }
   }
 
-  let raw = [];
-  try{
-    raw = await fetchItems("https://pekoramons.xyz/api/items");
-    if(!Array.isArray(raw)) raw = [];
-  }catch(e){
-    raw = [];
+  let valueMap = new Map();
+  async function loadValues(){
+    try{
+      const raw = await fetchJSON("https://pekoramons.xyz/api/items");
+      if(Array.isArray(raw)){
+        valueMap = new Map();
+        raw.forEach(it=>{
+          const n = (it.Name ?? it.name ?? "").toString();
+          if(!n) return;
+          valueMap.set(cleanName(n), Number(it.Value ?? it.value ?? 0) || 0);
+        });
+      }
+      log("value map loaded ->", valueMap.size, "entries");
+    }catch(e){
+      log("couldn't fetch items API:", e && e.message ? e.message : e);
+      valueMap = new Map();
+    }
   }
+  await loadValues();
 
-  const valueMap = new Map();
-  raw.forEach(it=>{
-    const n = (it.Name ?? it.name ?? "").toString();
-    if(!n) return;
-    valueMap.set(cleanName(n), Number(it.Value ?? it.value ?? 0) || 0);
-  });
+  function lookupValueForName(rawName){
+    if(!rawName) return undefined;
+    const name = rawName.trim();
+    const cleaned = cleanName(name);
+    if(valueMap.has(cleaned)) return valueMap.get(cleaned);
+    const stripped = name.replace(/\(.*?\)|\[.*?\]|\{.*?\}/g,"").trim();
+    const cleanedStripped = cleanName(stripped);
+    if(cleanedStripped && valueMap.has(cleanedStripped)) return valueMap.get(cleanedStripped);
+    return undefined;
+  }
 
   const css = `
-.pekora-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2147483600;overflow:visible}
-.custom-value-tag{font-family:Arial,sans-serif;display:inline-block;gap:6px;font-size:13px;padding:4px 8px;border-radius:6px;background:rgba(10,10,10,0.92);color:#e6ffed;white-space:nowrap;pointer-events:auto;user-select:none;line-height:1;position:absolute;z-index:2147483650;transform:translateX(-50%);max-width:calc(100% - 12px);box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
-.custom-value-tag.small{padding:3px 6px;font-size:12px;border-radius:5px;box-shadow:none !important}
-.custom-value-tag .value{color:#00e676;font-weight:700;font-size:13px}
-.custom-overpay-summary{font-family:Arial,sans-serif;position:absolute;pointer-events:auto;padding:8px 10px;border-radius:8px;min-width:140px;text-align:left;font-weight:700;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,0.5);background:rgba(12,12,12,0.96);color:#ffffff;line-height:1.1;z-index:2147483650;left:8px;bottom:10px;top:auto;right:auto;transform:none;max-width:calc(100% - 16px);box-sizing:border-box}
-.custom-overpay-summary .title{font-weight:800;margin-bottom:6px;font-size:14px}
-.custom-overpay-summary .line{margin-top:4px;font-size:13px;display:flex;justify-content:space-between;gap:8px;font-weight:600}
-.custom-overpay-summary .numbers{font-weight:900;margin-left:8px}
-.custom-overpay-summary .pos{color:#7ef39a!important}
-.custom-overpay-summary .neg{color:#ff7f7f!important}
-.custom-overpay-summary .line>span:first-child{color:#ffffff!important}
-.collectible-value-inline{position:absolute;left:50%;transform:translateX(-50%);bottom:6px;pointer-events:auto;font-weight:700;font-size:12px;padding:3px 6px;border-radius:6px;background:rgba(8,8,8,0.85);color:#bfffd6;z-index:2147483650;white-space:nowrap}
-.total-value-added{color:#7ef39a;font-weight:800;margin-top:6px}
+.pekora-value-num{font-weight:800;color:#7ef39a}
+.pekora-value-icon{margin-left:6px;vertical-align:middle;display:inline-block}
 `;
   const st = document.createElement("style");
   st.textContent = css;
   document.head.appendChild(st);
+
+  const VALUE_WRAPPER_ID = "pekora-catalog-value-only";
+  const VALUE_P_ID = "pekora-catalog-value-only-p";
+  const NAME_SELECTORS = [
+    ".itemHeaderContainer-0-2-45 h2",
+    ".itemHeaderContainer-0-2-45 .title",
+    "h1",
+    ".fw-bolder",
+    ".item-title",
+    'meta[property="og:title"]'
+  ];
+  function findNameOnPage(){
+    for(const s of NAME_SELECTORS){
+      try{
+        if(s.startsWith("meta")){
+          const m = document.querySelector(s);
+          if(m && m.content) return m.content.trim();
+        } else {
+          const el = document.querySelector(s);
+          if(el && (el.textContent||"").trim()) return el.textContent.trim();
+        }
+      }catch(e){}
+    }
+    return document.title || "";
+  }
+  function isCatalogPage(){
+    return /^https?:\/\/(?:www\.)?pekora\.zip\/catalog\/\d+\/?.*/.test(location.href);
+  }
+
+  function findImageInsertionPoint(){
+    const preferred = [".item-image", ".item-media", ".itemImage-0-2-36", ".itemDisplay-0-2-20", ".itemVisualizer-0-2-55", ".thumbnail-0-2-1", ".image"];
+    for(const s of preferred){
+      try{
+        const el = document.querySelector(s);
+        if(el) return el;
+      }catch(e){}
+    }
+
+    const imgs = Array.from(document.querySelectorAll("img")).filter(img => {
+      try{
+        if(img.offsetParent === null) return false;
+        const nw = img.naturalWidth || img.width || 0;
+        const nh = img.naturalHeight || img.height || 0;
+        return Math.max(nw, nh) >= 60;
+      }catch(e){ return false; }
+    });
+
+    if(imgs.length === 0) return document.body;
+
+    const candidates = imgs.map(img=>{
+      const r = img.getBoundingClientRect();
+      const area = Math.max(0, r.width) * Math.max(0, r.height);
+      const centerX = r.left + r.width/2;
+      const leftBias = centerX < (window.innerWidth * 0.55) ? 1 : 0;
+      return { img, area, leftBias, r };
+    });
+
+    candidates.sort((a,b) => {
+      if(a.leftBias !== b.leftBias) return b.leftBias - a.leftBias;
+      return b.area - a.area;
+    });
+
+    const chosen = candidates[0].img;
+    const parent = chosen.closest("figure, .card, .thumbnail, .image, .item, .col, .item-media, .item-image") || chosen.parentElement || chosen;
+    return parent;
+  }
+
+  function ensureVisibleUpchain(el, levels = 6){
+    let cur = el;
+    let depth = 0;
+    while(cur && cur !== document.body && depth < levels){
+      try{
+        const cs = window.getComputedStyle(cur);
+        if(cs.overflow && cs.overflow !== 'visible') cur.style.setProperty('overflow','visible','important');
+        if(cs.visibility && cs.visibility !== 'visible') cur.style.setProperty('visibility','visible','important');
+        if(cs.display && cs.display === 'none') cur.style.setProperty('display','block','important');
+      }catch(e){}
+      cur = cur.parentElement;
+      depth++;
+    }
+  }
+
+  function buildValuePill(valueText, rawVal){
+    const wrapper = document.createElement("div");
+    wrapper.id = VALUE_WRAPPER_ID;
+    wrapper.className = "pekora-inserted-value-only";
+    wrapper.style.setProperty('display','block','important');
+    wrapper.style.setProperty('margin-top','8px','important');
+    wrapper.style.setProperty('z-index','999999','important');
+
+    const p = document.createElement("p");
+    p.id = VALUE_P_ID;
+    p.className = "pekora-value-clamp";
+    p.dataset.pekoraCatalogValue = String(rawVal ?? "");
+    p.innerHTML = `<b>Value</b> <span class="pekora-value-num">${valueText}</span> <span class="icon-robux priceIcon-0-2-218 pekora-value-icon" aria-hidden="true"></span>`;
+
+    p.style.setProperty('display','inline-block','important');
+    p.style.setProperty('background','rgba(74,74,74,0.92)','important');
+    p.style.setProperty('color','#ffffff','important');
+    p.style.setProperty('padding','6px 10px','important');
+    p.style.setProperty('border-radius','8px','important');
+    p.style.setProperty('font-weight','600','important');
+    p.style.setProperty('margin-top','6px','important');
+    p.style.setProperty('line-height','1.1','important');
+
+    wrapper.appendChild(p);
+    return wrapper;
+  }
+
+  async function insertValueUnderImageOnce(){
+    try{
+      if(!isCatalogPage()) return false;
+
+      const name = findNameOnPage();
+      const rawVal = lookupValueForName(name);
+      const valueText = rawVal === undefined || rawVal === null ? "N/A" : formatNumber(rawVal);
+
+      const existingWrapper = document.getElementById(VALUE_WRAPPER_ID);
+      if(existingWrapper){
+        const p = document.getElementById(VALUE_P_ID);
+        if(p){
+          p.dataset.pekoraCatalogValue = String(rawVal ?? "");
+          const num = p.querySelector('.pekora-value-num');
+          if(num) num.textContent = valueText;
+          p.style.setProperty('background','rgba(74,74,74,0.92)','important');
+          p.style.setProperty('color','#ffffff','important');
+          ensureVisibleUpchain(existingWrapper, 6);
+          log("updated value pill under image for:", name, "->", valueText);
+          return true;
+        }
+      }
+
+      const imageContainer = findImageInsertionPoint();
+      if(!imageContainer){
+        log("no image container found - aborting insertion");
+        return false;
+      }
+
+      const legacy = document.getElementById("pekora-catalog-value-insert");
+      if(legacy) legacy.remove();
+
+      const wrapper = buildValuePill(valueText, rawVal);
+
+      try{
+        imageContainer.appendChild(wrapper);
+      }catch(e){
+        try{ (imageContainer.parentElement || document.body).appendChild(wrapper); }catch(e2){ document.body.appendChild(wrapper); }
+      }
+
+      // ensure visible
+      ensureVisibleUpchain(wrapper, 6);
+
+      log("inserted value for:", name, "->", valueText, "parent:", imageContainer && (imageContainer.tagName + (imageContainer.className ? " " + imageContainer.className : "")));
+      return true;
+    }catch(e){
+      console.error(LOG, "insertValueUnderImageOnce error", e);
+      return false;
+    }
+  }
+
+  function tryInsertValueWithRetries(maxAttempts = 12, intervalMs = 450){
+    let attempts = 0;
+    const id = setInterval(async ()=>{
+      attempts++;
+      try{
+        const ok = await insertValueUnderImageOnce();
+        if(ok || attempts >= maxAttempts){ clearInterval(id); if(!ok) log("value insertion gave up after", attempts, "attempts"); }
+      }catch(e){ console.error(LOG, "tryInsertValueWithRetries err", e); if(attempts >= maxAttempts) clearInterval(id); }
+    }, intervalMs);
+    return ()=> clearInterval(id);
+  }
 
   function ensureOverlayFor(parent){
     if(!parent) return null;
@@ -101,27 +277,14 @@
     parent._pekora_overlay = ov;
     return ov;
   }
-
-  function createValueTagElement(text){
+  function createValueTag(text){
     const el = document.createElement("div");
     el.className = "custom-value-tag small";
-    el.style.display = "none";
     el.style.position = "absolute";
-    const v = document.createElement("div");
-    v.className = "value";
-    v.textContent = text;
-    el.appendChild(v);
+    el.style.display = "none";
+    const v = document.createElement("div"); v.className = "value"; v.textContent = text; el.appendChild(v);
     return el;
   }
-
-  function createSummaryElement(){
-    const el = document.createElement("div");
-    el.className = "custom-overpay-summary";
-    el.style.display = "none";
-    el.style.position = "absolute";
-    return el;
-  }
-
   function positionTagForBox(tagEl, boxEl, modalEl){
     if(!tagEl || !boxEl || !modalEl) return;
     const rect = boxEl.getBoundingClientRect();
@@ -137,57 +300,6 @@
     tagEl.style.textOverflow = "ellipsis";
     tagEl.style.whiteSpace = "nowrap";
   }
-
-  const SUMMARY_LEFT_INSET = 8;
-  const SUMMARY_BOTTOM_INSET = 12;
-
-  function positionSummaryForModal(summaryEl, modalEl){
-    if(!summaryEl || !modalEl) return;
-    const modalRect = modalEl.getBoundingClientRect();
-    if(modalRect.width === 0 && modalRect.height === 0){ summaryEl.style.display='none'; return; }
-    summaryEl.style.display = "";
-
-    let sW = summaryEl.offsetWidth || 160;
-    let sH = summaryEl.offsetHeight || 64;
-    const minViewportX = 6 + window.scrollX;
-    const outsideLeftCandidateViewport = modalRect.left - sW - 12 + window.scrollX;
-    const preferredInsideLeftRelative = SUMMARY_LEFT_INSET;
-
-    let finalLeftRelative;
-    if(outsideLeftCandidateViewport >= minViewportX){
-      finalLeftRelative = -sW - 12;
-    } else {
-      finalLeftRelative = preferredInsideLeftRelative;
-    }
-
-    let finalTopRelative = Math.round(modalRect.height - SUMMARY_BOTTOM_INSET - sH);
-    if(finalTopRelative < 6) finalTopRelative = 6;
-
-    summaryEl.style.left = `${finalLeftRelative}px`;
-    summaryEl.style.top = `${finalTopRelative}px`;
-    summaryEl.style.right = "unset";
-    summaryEl.style.bottom = "unset";
-    summaryEl.style.position = "absolute";
-    summaryEl.style.transform = "none";
-
-    if(summaryEl.offsetWidth === 0 || summaryEl.offsetHeight === 0){
-      requestAnimationFrame(()=> positionSummaryForModal(summaryEl, modalEl));
-    }
-  }
-
-  function lookupValueForName(rawName){
-    if(!rawName) return undefined;
-    const name = rawName.trim();
-    const cleaned = cleanName(name);
-    if(valueMap.has(cleaned)) return valueMap.get(cleaned);
-
-    const stripped = name.replace(/\(.*?\)|\[.*?\]|\{.*?\}/g, "").trim();
-    const cleanedStripped = cleanName(stripped);
-    if(cleanedStripped && valueMap.has(cleanedStripped)) return valueMap.get(cleanedStripped);
-
-    return undefined;
-  }
-
   function findTradeModal(){
     const candidates = [".col-9", ".TradeRequest", ".innerSection-0-2-123", ".trade-modal", ".trade-window", ".modal", '[role="dialog"]'];
     for(const s of candidates){
@@ -203,7 +315,6 @@
     }
     return null;
   }
-
   function gatherItemBoxes(modal){
     const strict = (() => {
       const rows = Array.from(modal.querySelectorAll(".row.ms-1.mb-4"));
@@ -215,7 +326,6 @@
       return boxes;
     })();
     if(strict.length) return strict;
-
     const boxes = [];
     const imgs = Array.from(modal.querySelectorAll("img"));
     for(const img of imgs){
@@ -237,7 +347,6 @@
     }
     return boxes;
   }
-
   function findNameInBox(box){
     if(!box) return "";
     const isLabelish = txt => {
@@ -267,7 +376,6 @@
     for(const line of lines) if(!isLabelish(line)) return line;
     return "";
   }
-
   function clearModalMarkers(modal){
     if(!modal) return;
     const ov = modal._pekora_overlay;
@@ -277,27 +385,6 @@
     modal.querySelectorAll("[data-pekora-enhanced]").forEach(n=>n.removeAttribute("data-pekora-enhanced"));
     modal.querySelectorAll("[data-pekora-value]").forEach(n=>n.removeAttribute("data-pekora-value"));
   }
-
-  function createValueTag(valText){
-    const el = document.createElement("div");
-    el.className = "custom-value-tag small";
-    el.style.position = "absolute";
-    el.style.display = "none";
-    const v = document.createElement("div");
-    v.className = "value";
-    v.textContent = valText;
-    el.appendChild(v);
-    return el;
-  }
-
-  function createSummaryForOverlay(){
-    const el = document.createElement("div");
-    el.className = "custom-overpay-summary";
-    el.style.position = "absolute";
-    el.style.display = "none";
-    return el;
-  }
-
   function enhanceModal(modal){
     if(!modal) return 0;
     const overlay = ensureOverlayFor(modal);
@@ -341,10 +428,11 @@
       giveTotal = 0; receiveTotal = 0;
       enhancedBoxes.forEach((b,i)=>{ const v=Number(b.dataset.pekoraValue)||0; if(i < enhancedBoxes.length/2) giveTotal += v; else receiveTotal += v; });
     }
-
     const overpay = receiveTotal - giveTotal;
-    const summary = createSummaryForOverlay();
-    summary.innerHTML = '';
+    const summary = document.createElement("div");
+    summary.className = "custom-overpay-summary";
+    summary.style.position = "absolute";
+    summary.style.display = "none";
     const title = document.createElement('div'); title.className = 'title';
     title.textContent = overpay === 0 ? 'Fair Trade' : (overpay > 0 ? `+${formatNumber(overpay)}` : `${formatNumber(overpay)}`);
     if(overpay > 0) title.classList.add('pos'); else if(overpay < 0) title.classList.add('neg');
@@ -361,43 +449,9 @@
     summary.dataset.pekoraSrcType = 'modal-summary';
     summary.dataset.pekoraModal = (modal._pekora_id || '');
     overlay.appendChild(summary);
-    positionSummaryForModal(summary, modal);
     requestReposition();
     log("inserted tags:", inserted, "giveTotal:", giveTotal, "receiveTotal:", receiveTotal, "overpay:", overpay);
     return inserted;
-  }
-
-  function requestRepositionFactory(){
-    let pending = false;
-    return function requestReposition(){
-      if(pending) return;
-      pending = true;
-      requestAnimationFrame(()=>{ pending = false; repositionAll(); });
-    };
-  }
-  const requestReposition = requestRepositionFactory();
-  window.addEventListener('resize', requestReposition, { passive:true });
-  window.addEventListener('scroll', requestReposition, { passive:true });
-  const repositionInterval = setInterval(requestReposition, 800);
-
-  function repositionAll(){
-    const overlays = Array.from(document.querySelectorAll('.pekora-overlay'));
-    for(const ov of overlays){
-      const parent = ov.parentElement;
-      if(!parent) continue;
-      for(const child of Array.from(ov.children)){
-        try {
-          const type = child.dataset.pekoraSrcType;
-          const src = child._pekora_src_element;
-          if(!src) continue;
-          if(type === 'box'){
-            positionTagForBox(child, src, parent);
-          } else if(type === 'modal-summary'){
-            positionSummaryForModal(child, parent);
-          }
-        } catch(e){}
-      }
-    }
   }
 
   function enhanceCollectiblesPage(){
@@ -445,25 +499,55 @@
     } catch(e){ console.error(LOG, "enhanceCollectiblesPage err", e); }
   }
 
-  function scheduleEnhanceOnViewDetails(){
-    document.body.addEventListener("click", (e)=>{
-      try {
-        if(e.target && e.target.textContent && e.target.textContent.trim().toLowerCase() === "view details"){
-          setTimeout(()=>{
-            let tries = 0;
-            const id = setInterval(()=>{
-              const modal = findTradeModal();
-              if(modal && modal.querySelector("img")){
-                clearInterval(id);
-                enhanceModal(modal);
-              }
-              if(++tries > 12) clearInterval(id);
-            }, 300);
-          }, 220);
-        }
-      } catch(e){}
-    });
+  function requestRepositionFactory(){
+    let pending = false;
+    return function requestReposition(){
+      if(pending) return;
+      pending = true;
+      requestAnimationFrame(()=>{ pending = false; repositionAll(); });
+    };
   }
+  const requestReposition = requestRepositionFactory();
+  window.addEventListener('resize', requestReposition, { passive:true });
+  window.addEventListener('scroll', requestReposition, { passive:true });
+  const repositionInterval = setInterval(requestReposition, 800);
+
+  function repositionAll(){
+    const overlays = Array.from(document.querySelectorAll('.pekora-overlay'));
+    for(const ov of overlays){
+      const parent = ov.parentElement;
+      if(!parent) continue;
+      for(const child of Array.from(ov.children)){
+        try {
+          const type = child.dataset.pekoraSrcType;
+          const src = child._pekora_src_element;
+          if(!src) continue;
+          if(type === 'box'){
+            positionTagForBox(child, src, parent);
+          } else if(type === 'modal-summary'){
+            positionTagForBox(child, src, parent);
+          }
+        } catch(e){}
+      }
+    }
+  }
+
+  (function hijackHistory(){
+    const _push = history.pushState;
+    history.pushState = function(){
+      _push.apply(this, arguments);
+      window.dispatchEvent(new Event("locationchange"));
+    };
+    window.addEventListener("popstate", ()=> window.dispatchEvent(new Event("locationchange")));
+    window.addEventListener("locationchange", () => {
+      log("location changed ->", location.href);
+      setTimeout(()=> {
+        tryInsertValueWithRetries(12, 400);
+        const modal = findTradeModal(); if(modal) enhanceModal(modal);
+        enhanceCollectiblesPage();
+      }, 350);
+    });
+  })();
 
   const mo = new MutationObserver((muts)=>{
     let added = 0;
@@ -474,22 +558,24 @@
         const modal = findTradeModal();
         if(modal) enhanceModal(modal);
         enhanceCollectiblesPage();
-      }, 180);
+        tryInsertValueWithRetries(8, 400);
+      }, 160);
     }
   });
   mo.observe(document, { childList: true, subtree: true });
 
-  setTimeout(()=>{ const m = findTradeModal(); if(m) enhanceModal(m); enhanceCollectiblesPage(); }, 700);
-  setTimeout(()=>{ const m = findTradeModal(); if(m) enhanceModal(m); enhanceCollectiblesPage(); }, 1500);
-  scheduleEnhanceOnViewDetails();
+  setTimeout(()=>{ tryInsertValueWithRetries(12, 400); const m=findTradeModal(); if(m) enhanceModal(m); enhanceCollectiblesPage(); }, 700);
+  setTimeout(()=>{ tryInsertValueWithRetries(8, 600); const m=findTradeModal(); if(m) enhanceModal(m); enhanceCollectiblesPage(); }, 1600);
+  setTimeout(()=>{ tryInsertValueWithRetries(4, 1000); }, 4000);
 
   window.__pekoraEnhancer = {
-    reScan: ()=>{ const m=findTradeModal(); if(m) clearModalMarkers(m); const mm = findTradeModal(); if(mm) enhanceModal(mm); enhanceCollectiblesPage(); },
+    reScan: ()=> { tryInsertValueWithRetries(8, 400); },
+    reloadValues: async ()=> { await loadValues(); tryInsertValueWithRetries(8,400); },
     dataCount: ()=> valueMap.size,
     sample: ()=> Array.from(valueMap.entries()).slice(0,12)
   };
 
   window.addEventListener("beforeunload", ()=>{ try{ if(repositionInterval) clearInterval(repositionInterval); mo.disconnect(); }catch(e){} });
 
-  log("PekoraEnhancer ready — exact-match lookup enabled");
+  log("PekoraEnhancer ready");
 })();
